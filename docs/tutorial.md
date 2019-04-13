@@ -4,9 +4,9 @@ title: Step-by-Step Tutorial
 ---
 
 This document provides a step-by-step tutorial for the reSolve framework.
-Throughout this tutorial, you will be creating a single application. You will modify your application as you learn new concepts, so with every consequent lesson the application will become more and more sophisticated.
+Throughout this tutorial, you will create a single application. You will modify your application as you learn new concepts, so with every consequent lesson the application will become more and more sophisticated.
 
-This tutorial will give you an understanding of the reSolve framework and its fundamental concepts. It is recommended that your familiarize yourself with event sourcing and CQRS before starting this tutorial, however it is not strictly required.
+This tutorial will give you an understanding of the reSolve framework and its fundamental concepts. It is recommended that your familiarize yourself with event sourcing and CQRS before you start this tutorial, however it is not strictly required.
 
 ## Table of Contents
 
@@ -22,13 +22,13 @@ This tutorial will give you an understanding of the reSolve framework and its fu
 
 ## **Lesson 1** - Create a New reSolve Application
 
-You can create a new reSolve app using the create-resolve-app utility available on **npm**:
+Use the create-resolve-app tool to create a new reSolve app:
 
 ##### npm:
 
 ```sh
-npm i -g create-resolve-app
-create-resolve-app shopping-list
+$ npm i -g create-resolve-app
+$ create-resolve-app shopping-list
 ```
 
 ##### npx:
@@ -43,9 +43,10 @@ $ npx create-resolve-app shopping-list
 $ yarn create resolve-app shopping-list
 ```
 
-After this a minimal reSolve application is ready. You can run it in development mode by typing:
+After this, a minimal reSolve application is ready. To run it in development mode, type:
 
 ```sh
+$ cd shopping-list
 $ yarn run dev
 ```
 
@@ -55,9 +56,9 @@ $ yarn run dev
 
 [\[Get the Code for This Lesson\]](https://github.com/reimagined/resolve/tree/master/examples/shopping-list-tutorial/lesson-2)
 
-This lesson will teach you how to implement a basic write side for your reSolve application. An application's [write side](resolve-app-structure.md#write-and-read-sides) is responsible for handling commands, performing input validation and emitting **events** based on valid commands. The emitted events are then saved to the **event store**.
+This lesson will teach you how to implement a basic write side for your reSolve application. An application's [write side](resolve-app-structure.md#write-and-read-sides) handles commands, performs input validation and emits **events** based on valid commands. The framework then saves the emitted events to the **event store**.
 
-In CQRS and Event Sourcing paradigms, commands are handled by Domain Objects, which are grouped into aggregates. ReSolve implements aggregates as static objects containing sets of functions. These functions can be of one of the following two kinds:
+In the CQRS and Event Sourcing paradigms, commands are handled by Domain Objects grouped into aggregates. ReSolve implements aggregates as static objects that contain sets of functions. These functions can be of one of the following two kinds:
 
 - **[Command Handlers](write-side.md#aggregate-command-handlers)** - Handle commands and emit events in response.
 - **[Projections](write-side.md#aggregate-projection-function)** - Build aggregate state from events so this state can be observed on the write side, for example to perform input validation.
@@ -66,7 +67,7 @@ In CQRS and Event Sourcing paradigms, commands are handled by Domain Objects, wh
 
 Use the following steps to implement the write side for your shopping list application.
 
-To add an aggregate to you shopping list application, first define types of events that this aggregate will produce. Create an **eventTypes.js** file in the project's **common** folder and add the following content to it.
+To add an aggregate to you shopping list application, first define types of events that this aggregate can produce. Create an **eventTypes.js** file in the project's **common** folder and add the following content to it.
 
 **common/eventTypes.js:**
 
@@ -81,10 +82,10 @@ export const SHOPPING_ITEM_CREATED = "SHOPPING_ITEM_CREATED";
 
 <!-- prettier-ignore-end -->
 
-For now, your application requires only two types of events:
+For now, your application requires only two event types:
 
-- The SHOPPING_LIST_CREATED event signals about creation of a shopping list.
-- The SHOPPING_ITEM_CREATED event signals about creation of an item within a shopping list.
+- SHOPPING_LIST_CREATED - Signals about creation of a shopping list;
+- The SHOPPING_ITEM_CREATED - Signals about creation of an item within a shopping list.
 
 Next, create a **shopping_list.commands.js** file in the **common/aggregates** folder. This file will contain command handlers for the ShoppingList aggregate. Add the following code to the file:
 
@@ -109,11 +110,16 @@ export default {
 }
 ```
 
-As you can see, the file exports an object containing two command handlers. A command handler receives the aggregate state and a command payload. A payload can contain any arbitrary data related to the command. For example, the **createShoppingList** command's payload contains a shopping list name, and the **createShoppingItem** command payload contains an item's ID and text to display.
+This file exports an object with two command handlers. A command handler receives the aggregate state and a command payload. A payload can contain any arbitrary data related to the command. For example, the **createShoppingList** command's payload contains a shopping list name, and the **createShoppingItem** command payload contains an item's ID and text to display.
 
-As the result of its execution, a command handler returns an event object. This object contains an obligatory **type** field defining the event's type and the **payload** field containing data associated with the event. In the example code, the event payloads contain the same field that were obtained from the command payloads. The reSolve framework saves events returned by command handlers to a persistent **[event store](write-side.md#event-store)**. For now, your application is configured to use a file-based event store, which is sufficient for learning purposes. Later on, you will learn how to use different kinds of stores using **[storage adapters](advanced-techniques.md#adapters)**.
+A command handler returns an event object. This object should contain the following obligatory fields:
 
-Your minimal shopping list aggregate is now ready. The last step is to register it in the application's configuration file. Open the **config.app.js** file, locate the **aggregates** section and specify the following settings:
+- **type** - specifies the event's type;
+- **payload** - specifies data associated with the event.
+
+In the example code, the event payload contains the same fields that were obtained from the command payloads. The reSolve framework saves events returned by command handlers to a persistent **[event store](write-side.md#event-store)**. For now, your application is configured to use a file-based event store, which is sufficient for learning purposes.
+
+Your minimal shopping list aggregate is now ready. The last step is to register it in the application's configuration file. Open the **config.app.js** file, locate the **aggregates** configuration section and specify the following settings:
 
 **config.app.js:**
 
@@ -128,13 +134,9 @@ aggregates: [
 ...
 ```
 
-Here, you just specify the aggregate name and the path to the file containing the aggregate's command handlers.
-
 ### Sending Commands to an Aggregate
 
-Now that your application is capable of handling commands, you can try sending such commands to create a shopping list and populate it with items.
-
-ReSolve framework provides a standard API that allows you to send commands to an application's aggregate using HTTP requests.
+Now that your application can commands, you can use the reSolve framework's standard HTTP API to send such commands to create a shopping list and populate it with items.
 
 A request body should have the `application/json` content type and contain a JSON representation of the command:
 
@@ -231,9 +233,9 @@ Now, you can check the event store file to see the newly created event. Open the
 
 Your application's write side currently does not perform any input validation. This results in the following flaws:
 
-- The aggregate allows you to create shopping lists and items without specifying the required fields in the payload.
+- The command handlers do not check whether or not all required fields are provided in a command's payload.
 - It is possible to create more then one shopping list with the same aggregate ID.
-- You can create items for a shopping list that does not exist.
+- You can create items in a shopping list that does not exist.
 
 You can overcome the first flaw by adding simple checks to each command handler:
 
@@ -251,7 +253,7 @@ createShoppingItem: (state, { payload: { id, text } }) => {
 }
 ```
 
-To overcome the second and third flaws, you need to somehow store information about previously performed operations. You can achieve this by maintaining an **aggregate state**. This state is assembled on the fly by an aggregate **projection** from previously created events. To add a projection to the ShoppingList aggregate, create a **shopping_list.projection.js** file in the **common/aggregates** folder and add the following code there:
+To overcome the second and third flaws, you you can use the **aggregate state**. This state is assembled on the fly by an aggregate **projection** from previously created events. To add a projection to the ShoppingList aggregate, create a **shopping_list.projection.js** file in the **common/aggregates** folder and add the following code there:
 
 **common/aggregates/shopping_list.projection.js:**
 
@@ -393,11 +395,11 @@ Command error: shopping list does not exist
 
 [\[Get the Code for This Lesson\]](https://github.com/reimagined/resolve/tree/master/examples/shopping-list-tutorial/lesson-3)
 
-Currently, your shopping list application has a fully functional write side allowing you to create shopping lists and items in these lists. However, it does not provide means to query the created data. This lesson will teach you how to provide your application with the capability to answer data queries by implementing the application's **[read side](resolve-app-structure.md#write-and-read-sides)**.
+Currently, your shopping list application has a fully functional write side. This allows your application to create shopping lists and items in these lists. However, with only a write side your application does not provide means to query the created data. This lesson will teach you how to implement the application's **[read side](resolve-app-structure.md#write-and-read-sides)** to answer data queries.
 
 ### Implement a View Model
 
-A reSolve applications read side answers queries using **[Read Models](read-side.md#read-models)**. In this lesson, you will implement a **[View Model](read-side.md#view-model-specifics)**, which is a Read Model of a special kind used to build an application's state on the fly, so you can keep the implementation simple. In a [later lesson](#implement-a-shopping-lists-read-model), you will learn how to use regular Read Models to answer queries based on accumulated persistent state.
+A reSolve application's read side uses Read Models toe answer queries. In this lesson, you will implement a **[View Model](read-side.md#view-model-specifics)**. View Models are Read Models used to build an application's state on the fly. This will allow you to keep the implementation simple. In a [later lesson](#implement-a-shopping-lists-read-model), you will learn how to use regular Read Models to answer queries based on an accumulated persistent state.
 
 Create a **shopping_list.projection.js** file in the **view-models** folder and add the following code to this file:
 
@@ -451,7 +453,7 @@ viewModels: [
 
 ### Query a View Model via HTTP API
 
-Now you can tests the read side's functionality by sending an HTTP request to query the Shopping List View Model. You can query a View Model by sending an HTTP request to your application as shown below:
+Now you can tests the read side's functionality. Send an HTTP request to query the Shopping List View Model:
 
 ```sh
 $  curl -i -g -X GET "http://localhost:3000/api/query/ShoppingList/shopping-list-1"
@@ -512,7 +514,7 @@ http://{host}:{port}/api/query/{viewModel}/{aggregateIds}
 
 In the previous lesson, you modified your application so that it can answer queries. However, at this moment, your application does not provide a [frontent](frontend.md) that would present this data to an end-user. In this lesson, you will learn how to create a React frontend to display your reSolve application's data.
 
-To keep the example code simple, in this lesson you will only display items of a single shopping list. Later on, you will add support for multiple shopping lists and provide the required means of navigation between lists.
+In this lesson you will only display a single shopping list's items to keep the example code simple. Later on, you will add support for multiple shopping lists and provide the required means of navigation between lists.
 
 This tutorial sticks to React + Redux as the default choice for building a frontend for a reSolve application. Both React and Redux work well in conjunction with reSolve's infrastructure. ReSolve comes with the client **resolve-redux** library that provides HOCs allowing you to easily connect your React components to the backend.
 
@@ -520,7 +522,7 @@ Note that, if required, you can use the [standard HTTP API](curl.md) to communic
 
 ### Implement a React Frontend
 
-Create a **ShoppingList.js** file in the client application's containers folder. In this file, implement a component that displays a list of values obtained from the **[data](frontend.md#obtain-view-model-data)** prop:
+Create a **ShoppingList.js** file in the client application's **containers** folder. In this file, implement a component that displays a list of values obtained from the **[data](frontend.md#obtain-view-model-data)** prop:
 
 **client/containers/ShoppingList.js:**
 
@@ -549,7 +551,7 @@ export class ShoppingList extends React.PureComponent {
 
 <!-- prettier-ignore-end -->
 
-Now you can use the **resolve-redux** library's **connectViewModel** HOC to bind your component to the **ShoppingList** view model implemented earlier:
+Now you can use the **resolve-redux** library's **connectViewModel** HOC to bind your component to the **ShoppingList** view model that you implemented earlier implemented earlier:
 
 **client/containers/ShoppingList.js:**
 
@@ -569,7 +571,7 @@ export default connectViewModel(mapStateToOptions)(ShoppingList)
 
 <!-- prettier-ignore-end -->
 
-The connectViewModel HOC binds the original component to a reSolve View Model based on options provided by the **mapStateToOptions** function. The **data** prop that you used in your component's implementation is injected by this HOC and contains the View Model's response object. It is the same object that saw when you manually performed a data query using the HTTP API in the lesson 3:
+The connectViewModel HOC binds the original component to a reSolve View Model based on options specified by the **mapStateToOptions** function. The **data** prop that you used in your component's implementation is injected by this HOC and contains the View Model's response object. It is the same object that you saw when you manually performed a data query using the HTTP API in the lesson 3:
 
 ```js
 {
@@ -715,7 +717,7 @@ export default connectViewModel(mapStateToOptions)(
 
 <!-- prettier-ignore-end -->
 
-In this code, the component is first connected to a **Redux** state using the **connect** HOC from the **react-redux** library. Then, the component is connected to a reSolve View Model as it was in the previous lesson. The **connect** function is called with the specified **mapDispatchToProps** function. This function takes reSolve aggregate actions from the components payload and wraps them into a **dispatch** function call using the the **bindActionCreators** function.
+In this code, the component is first connected to a **Redux** state using the **connect** HOC from the **react-redux** library. Then, the component is connected to a reSolve View Model as in the previous lesson. The **connect** function is called with the specified **mapDispatchToProps** function. This function takes reSolve aggregate actions from the components payload and wraps them into a **dispatch** function call using the the **bindActionCreators** function.
 
 Now the ShoppingList component's props include the **toggleShoppingItem** function.
 
@@ -727,7 +729,7 @@ render() {
   ...
 ```
 
-You can use this function to handle item checking on the client and send the **toggleShoppingItem** command to the server along with the required data in the payload.
+You can use this function to handle item selection on the client and send the **toggleShoppingItem** command to the server along with the required data in the payload.
 
 In the code below, the **toggleShoppingItem** function is used to handle checkbox click events.
 
@@ -823,7 +825,7 @@ After these steps, your application's client UI should look as shown below.
 
 [\[Get the Code for This Lesson\]](https://github.com/reimagined/resolve/tree/master/examples/shopping-list-tutorial/lesson-6)
 
-In the previous two lessons, you have been implementing the client-side UI for viewing and editing items in a shopping list. However, you may have noticed that your application's functionality is incomplete: it is possible use HTTP API to create multiple shopping lists, but the client UI only allows viewing and editing only one specific list, namely **shopping-list-1**:
+In the previous two lessons, you implemented the client-side UI for viewing and editing items in a shopping list. However, you may have noticed that your application's functionality is incomplete: it is possible use HTTP API to create multiple shopping lists, but the client UI only allows an end uesr to view and edit only one specific list, namely **shopping-list-1**:
 
 **client/containers/ShoppingList.js:**
 
@@ -836,15 +838,15 @@ export const mapStateToOptions = (state, ownProps) => {
 }
 ```
 
-In this lesson, you will enhance your application's functionality with the capability to create multiple shopping lists, navigate between these lists and add items to them using the client UI.
+In this lesson, you will enhance your application's functionality with the capability to create multiple shopping lists, navigate between these lists and add items to them from the client UI.
 
 ### Implement a Shopping Lists Read Model
 
-In the [Lesson 3](#lesson-3-read-side-create-a-view-model-to-query-list-items), you have implemented a View Model used to obtain information about shopping lists with the specified aggregate ID's. Although it is possible to use the same approach for obtaining the list of all available shopping lists, there is a strong reason not to do so.
+In the [Lesson 3](#lesson-3-read-side-create-a-view-model-to-query-list-items), you have implemented a View Model used to obtain information about shopping lists with the specified aggregate ID's. Although it is possible to use the same approach to obtain the list of all available shopping lists, there is a strong reason not to do so.
 
-Consider a situation, in which your application has been running in a production environment for a long time and a large number of shopping lists has been created. If you used a View Model to answer queries, a resulting data sample would be generated on the fly for every requests using events from the beginning of the history, which will result in a huge performance overhead on _each request_. Note that it is not a problem when you use a View Model to obtain a single list's items as the item count is always considerably small.
+Consider a situation, in which your application runs in a production environment for a long time and a large number of shopping lists is created. If you used a View Model to answer queries, a resulting data sample would be generated on the fly for every requests based on events from the beginning of the history. Thish would result in a huge performance overhead on _each request_. Note that it is not a problem when you use a View Model to obtain a single list's items as the item count is always considerably small.
 
-To overcome this issue, implement a ShoppingLists **[Read Model](read-side.md#read-models)**. This Read Model will gradually accumulate its state based on incoming events and store this state in the Read Model Storage. This part of the functionality is implemented by the Read Model **[projection](read-side.md)**:
+To overcome this issue, implement a ShoppingLists **[Read Model](read-side.md#read-models)**. This Read Model will gradually accumulate its state based on the incoming events and store this state in the Read Model Storage. This part of the functionality is implemented by the Read Model **[projection](read-side.md)**:
 
 **common/read-models/shopping_lists.projection.js:**
 
@@ -881,7 +883,7 @@ export default {
 
 <!-- prettier-ignore-end -->
 
-You also need to implement **[resolver functions](read-side.md#resolvers)** that will answer queries using the accumulated data.
+You also need to implement **[resolver functions](read-side.md#resolvers)** that use the accumulated data to answer queries.
 
 **common/read-models/shopping_lists.resolvers.js:**
 
@@ -923,7 +925,7 @@ Note that regular Read Models are not reactive like View Models are. This result
 
 ### Query a Read Model Through HTTP API
 
-You can test the ShoppingLists Read Model's functionality using the standard HTTP API:
+You can use the standard HTTP API to test the ShoppingLists Read Model's functionality:
 
 ```sh
 $ curl -X POST \
@@ -1102,9 +1104,9 @@ You can overcome this limitation by introducing optimistic UI updates as the nex
 
 ### Support Optimistic UI Updates
 
-With the optimistic UI updating approach, a component applies model changes to the client Redux state before sending them to the server using an aggregate command. Follow the steps below to provide such functionality.
+With the optimistic UI updating approach, a component applies model changes to the client Redux state before it sends the changes to the server using an aggregate command. Follow the steps below to provide such functionality.
 
-First, define Redux actions that will perform updates:
+First, define Redux actions that performs updates:
 
 **client/actions/optimistic_actions.js:**
 
@@ -1118,7 +1120,7 @@ export const OPTIMISTIC_SYNC = 'OPTIMISTIC_SYNC'
 
 <!-- prettier-ignore-end -->
 
-Implement an optimistic reducer function that responds to these commands to update the corresponding slice of the Redux state:
+Implement an optimistic reducer function that responds to these actions to update the corresponding slice of the Redux state:
 
 **client/reducers/optimistic_shopping_lists.js:**
 
@@ -1223,11 +1225,11 @@ Now, if you run your application and create a new shopping list, the created sho
 
 [\[Get the Code for This Lesson\]](https://github.com/reimagined/resolve/tree/master/examples/shopping-list-tutorial/lesson-7)
 
-In this lesson, you will provide miscellaneous functionality enhancements to your Shopping List application in order to support the full set of data editing operations. These steps are not essential, but they will help you further deepen your understanding of the reSolve framework's fundamentals.
+In this lesson, you will provide miscellaneous functionality enhancements to your Shopping List application to support the full set of data editing operations. These steps are not essential, but they will help you further deepen your understanding of the reSolve framework's fundamentals.
 
 ### Modify the Write Side
 
-Define additional events to provide the missing functionality.
+Define additional events to implement the missing functionality.
 
 **common/event_types.js:**
 
@@ -1248,7 +1250,7 @@ Modify the aggregate projection to account for shopping list deletion.
 [SHOPPING_LIST_REMOVED]: () => ({})
 ```
 
-Define command handlers to provide the data editing functionality.
+Define command handlers to provide the capability to edit data.
 
 **common/aggregates/shopping_list.commands.js:**
 
@@ -1326,8 +1328,8 @@ Modify the ShoppingLists Read Model projection.
 Add the required static content to the application's **static** folder. The example application uses the following static files:
 
 - The **Styles.css** file - Contains custom styles used by the application's client components.
-- The **fontawesome.min.css** file an the **webfonts** folder - The standard Font Awesome distribution.
-- The **close-button.png** image - An icon displayed by the button used to remove shopping list items.
+- The **fontawesome.min.css** file an the **webfonts** folder - The standard [Font Awesome](https://fontawesome.com/) distribution.
+- The **close-button.png** image - An icon that the button used to remove shopping list items displays.
 
 #### Update Components
 
@@ -1357,7 +1359,7 @@ const { lists, createShoppingList, removeShoppingList } = this.props
 <ShoppingLists lists={lists} removeShoppingList={removeShoppingList} />
 ```
 
-Modify the ShoppingList component to support shopping list renaming.
+Modify the ShoppingList component to provide the capability to rename shopping lists.
 
 **client/containers/ShoppingList.js:**
 
@@ -1456,7 +1458,7 @@ export default connectStaticBasedUrls(['css', 'favicon'])(Header)
 
 #### Update the Optimistic Update Code
 
-Modify the code performing optimistic UI updates to support shopping list deletion.
+Modify the code related to optimistic UI updates to support shopping list deletion.
 
 **client/actions/optimistic_actions.js:**
 

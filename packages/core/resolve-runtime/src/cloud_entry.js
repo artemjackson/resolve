@@ -6,11 +6,14 @@ import STS from 'aws-sdk/clients/sts'
 import Lambda from 'aws-sdk/clients/lambda'
 
 import wrapApiHandler from 'resolve-api-handler-awslambda'
+import { decodeEmptyStrings } from 'resolve-storage-dynamo'
 import createCommandExecutor from 'resolve-command'
 import createEventStore from 'resolve-es'
 import createQueryExecutor, { constants as queryConstants } from 'resolve-query'
 
 import mainHandler from './handlers/main_handler'
+import handleDeployServiceEvent from './handlers/deploy_service_event_handler'
+import handleEventBusEvent from './handlers/event_bus_event_handler'
 
 const invokeLambdaSelf = async event => {
   const lambda = new Lambda({ apiVersion: '2015-03-31' })
@@ -52,27 +55,15 @@ const initResolve = async (
     snapshotAdapter
   })
 
-  if (resolve.activeDemandSet == null) {
-    resolve.__proto__.activeDemandSet = new Set()
-  }
-
-  const doUpdateRequest = async (pool, readModelName, readOptions) => {
+  const doUpdateRequest = async (pool, readModelName) => {
     const executor = pool.getExecutor(pool, readModelName)
 
     Promise.resolve()
-      .then(() => executor.read(readOptions))
-      .catch(error => error)
-      .then(() => invokeLambdaSelf({ Records: [] }))
+      .then(executor.read.bind(null, { isBulkRead: true }))
+      .then(invokeLambdaSelf.bind(null, { Records: [] }))
       .catch(error => {
         resolveLog('error', 'Update lambda invocation error', error)
       })
-
-    if (!resolve.activeDemandSet.has(readModelName)) {
-      // Delay initial read-model on-demand request to enforce awaiting tables creation in common
-      // cases for better usability, but will be evenntually consistent anyway, even no timeout
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      resolve.activeDemandSet.add(readModelName)
-    }
   }
 
   const executeQuery = createQueryExecutor({
@@ -152,14 +143,30 @@ const lambdaWorker = async (
   const resolve = Object.create(resolveBase)
   try {
     await initResolve(assemblies, resolve)
-    resolveLog(
-      'debug',
-      'Lambda handler has initialized resolve instance',
-      resolve
-    )
+    resolveLog('debug', 'Lambda handler has initialized resolve instance')
 
+    // Resolve event invoked by deploy service
+    if (lambdaEvent.resolveSource === 'DeployService') {
+      resolveLog(
+        'debug',
+        'Lambda handler classified event as DeployService event',
+        lambdaEvent
+      )
+
+      executorResult = await handleDeployServiceEvent(lambdaEvent, resolve)
+    }
+    // Resolve event invoked by event bus
+    else if (lambdaEvent.resolveSource === 'EventBus') {
+      resolveLog(
+        'debug',
+        'Lambda handler classified event as Event Bus event',
+        lambdaEvent
+      )
+
+      executorResult = await handleEventBusEvent(lambdaEvent, resolve)
+    }
     // API gateway event
-    if (lambdaEvent.headers != null && lambdaEvent.httpMethod != null) {
+    else if (lambdaEvent.headers != null && lambdaEvent.httpMethod != null) {
       resolveLog(
         'debug',
         'Lambda handler classified event as API gateway',
@@ -172,9 +179,6 @@ const lambdaWorker = async (
       executorResult = await executor(lambdaEvent, lambdaContext)
     }
     // DynamoDB trigger event
-    // AWS DynamoDB streams guarantees that changesets from one table partition will
-    // be delivered strictly into one lambda instance, i.e. following code works in
-    // single-thread mode for one event storage - see https://amzn.to/2LkKXAV
     else if (lambdaEvent.Records != null) {
       resolveLog(
         'debug',
@@ -184,8 +188,12 @@ const lambdaWorker = async (
       const applicationPromises = []
       const events = lambdaEvent.Records.map(record =>
         Converter.unmarshall(record.dynamodb.NewImage)
-      )
-      // TODO. Refactoring MQTT publish event
+      ).map(({ payload, ...metaEvent }) => ({
+        ...metaEvent,
+        ...(payload !== undefined
+          ? { payload: decodeEmptyStrings(payload) }
+          : {})
+      }))
       for (const event of events) {
         const eventDescriptor = {
           topic: `${process.env.DEPLOYMENT_ID}/${event.type}/${

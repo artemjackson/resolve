@@ -5,6 +5,7 @@ import _createAdapter from 'resolve-storage-base'
 import connect from './connect'
 import init from './init'
 import loadEvents from './load-events'
+import getLatestEvent from './get-latest-event'
 import saveEvent from './save-event'
 import _dispose from './dispose'
 import createQuery from './create-query'
@@ -27,12 +28,16 @@ import resourceCreate from './resource/create'
 import resourceDispose from './resource/dispose'
 import resourceDestroy from './resource/destroy'
 
+import encodeEmptyStrings from './encode-empty-strings'
+import decodeEmptyStrings from './decode-empty-strings'
+
 // as adapter
 const createAdapter = _createAdapter.bind(
   null,
   connect,
   init,
   loadEvents,
+  getLatestEvent,
   saveEvent,
   _dispose,
   {
@@ -45,7 +50,9 @@ const createAdapter = _createAdapter.bind(
     expressionString,
     checkTableExists,
     executePaginationQuery,
-    executeSingleQuery
+    executeSingleQuery,
+    encodeEmptyStrings,
+    decodeEmptyStrings
   }
 )
 export { globalPartitionKey, rangedIndex, apiVersion }
@@ -67,4 +74,4 @@ const create = resourceCreate.bind(null, pool)
 const dispose = resourceDispose.bind(null, pool)
 const destroy = resourceDestroy.bind(null, pool)
 
-export { create, dispose, destroy }
+export { create, dispose, destroy, decodeEmptyStrings }
